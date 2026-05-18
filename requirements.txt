@@ -1,0 +1,7 @@
+Flask
+joblib
+numpy
+scikit_learn
+scipy
+openai-whisper
+flask-cors

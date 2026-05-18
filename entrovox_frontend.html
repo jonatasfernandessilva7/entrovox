@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENTROVOX — Speech Enhancement Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & Variables ─────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0c0f;
+    --surface:   #111418;
+    --panel:     #161b22;
+    --border:    #21282f;
+    --border2:   #2d3748;
+    --text:      #c9d1d9;
+    --muted:     #586069;
+    --accent:    #58a6ff;
+    --accent2:   #3fb950;
+    --warn:      #f0883e;
+    --danger:    #f85149;
+    --mono:      'Space Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+    --radius:    4px;
+  }
+
+  html { font-size: 13px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 400;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Scrollbar ─────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ── Header ────────────────────────────────────────────── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 22px; height: 22px;
+    border: 1.5px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-mark svg { width: 12px; height: 12px; }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 5px;
+    transition: background 0.3s;
+  }
+  .status-dot.online  { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .status-dot.offline { background: var(--danger); }
+
+  /* ── Layout ────────────────────────────────────────────── */
+  .app {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr 320px;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 48px);
+    overflow: hidden;
+  }
+
+  /* ── Panels ────────────────────────────────────────────── */
+  .panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+
+  .panel-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .panel-body { padding: 16px 18px; flex: 1; }
+
+  /* ── Section ───────────────────────────────────────────── */
+  .section { margin-bottom: 24px; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Form Controls ─────────────────────────────────────── */
+  label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 5px;
+    letter-spacing: 0.03em;
+  }
+
+  input[type="text"], input[type="url"], select, textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+
+  .form-row { margin-bottom: 12px; }
+
+  /* ── Toggle ────────────────────────────────────────────── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .toggle-label {
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .toggle {
+    position: relative;
+    width: 32px; height: 18px;
+    cursor: pointer;
+  }
+
+  .toggle input { opacity: 0; width: 0; height: 0; }
+
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border2);
+    border-radius: 18px;
+    transition: background 0.2s;
+  }
+
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+    pointer-events: none;
+  }
+
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(14px); }
+
+  /* ── Buttons ───────────────────────────────────────────── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 8px 16px;
+    border: 1px solid;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover { background: #79b8ff; border-color: #79b8ff; }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border2);
+    color: var(--text);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  /* ── Central panel ─────────────────────────────────────── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Waveform ──────────────────────────────────────────── */
+  .waveform-zone {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .waveform-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .waveform-wrap {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    gap: 4px;
+    height: 120px;
+  }
+
+  canvas.waveform {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* ── Drop zone ─────────────────────────────────────────── */
+  .drop-zone {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    margin: 0 24px 16px;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.04);
+  }
+
+  .drop-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+
+  .drop-text {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .drop-text strong { color: var(--accent); }
+
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Record button ─────────────────────────────────────── */
+  .record-zone {
+    padding: 0 24px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .btn-record {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--danger);
+    background: transparent;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .btn-record:hover { background: rgba(248, 81, 73, 0.12); }
+  .btn-record.recording { background: var(--danger); border-color: var(--danger); }
+  .btn-record.recording .rec-dot { animation: pulse-rec 0.8s ease-in-out infinite; }
+
+  .rec-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--danger);
+    transition: background 0.2s;
+  }
+  .btn-record.recording .rec-dot { background: #fff; }
+
+  @keyframes pulse-rec {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.8); opacity: 0.6; }
+  }
+
+  .record-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .record-status.active { color: var(--danger); }
+
+  .record-timer {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--danger);
+    min-width: 48px;
+  }
+
+  /* ── Action bar ────────────────────────────────────────── */
+  .action-bar {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--surface);
+  }
+
+  /* ── Results area ──────────────────────────────────────── */
+  .results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+
+  /* ── Transcript box ────────────────────────────────────── */
+  .transcript-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    min-height: 80px;
+    font-size: 15px;
+    font-family: var(--sans);
+    font-weight: 300;
+    line-height: 1.7;
+    color: var(--text);
+    position: relative;
+  }
+
+  .transcript-box.empty {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  .transcript-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .meta-chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .meta-chip .val { color: var(--accent); }
+
+  /* ── Metrics grid ──────────────────────────────────────── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+
+  .metric-name {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .metric-value.good  { color: var(--accent2); }
+  .metric-value.warn  { color: var(--warn); }
+  .metric-value.bad   { color: var(--danger); }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 3px;
+    font-weight: 400;
+  }
+
+  /* ── Entropy bar ───────────────────────────────────────── */
+  .entropy-bar-wrap {
+    margin-bottom: 16px;
+  }
+
+  .entropy-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .entropy-track {
+    height: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .entropy-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease, background 0.6s;
+  }
+
+  /* Zone markers */
+  .entropy-zones {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Frame distribution ────────────────────────────────── */
+  .frame-dist {
+    display: flex;
+    height: 32px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 6px;
+  }
+
+  .frame-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    transition: width 0.6s ease;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .frame-seg.valid   { background: rgba(63, 185, 80, 0.25); color: var(--accent2); }
+  .frame-seg.invalid { background: rgba(248, 81, 73, 0.25); color: var(--danger); }
+
+  .frame-legend {
+    display: flex;
+    gap: 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .frame-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 1px; }
+
+  /* ── WER compare ───────────────────────────────────────── */
+  .wer-compare {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .wer-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+
+  .wer-row:last-child { border-bottom: none; }
+
+  .wer-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    width: 80px;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+
+  .wer-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--panel);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .wer-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.7s ease;
+  }
+
+  .wer-pct {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    width: 44px;
+    text-align: right;
+  }
+
+  /* ── Log ───────────────────────────────────────────────── */
+  .log-area {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--muted);
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 18px;
+  }
+
+  .log-line { display: flex; gap: 10px; }
+  .log-time { color: var(--border2); flex-shrink: 0; }
+  .log-line.info  .log-msg { color: var(--text); }
+  .log-line.ok    .log-msg { color: var(--accent2); }
+  .log-line.warn  .log-msg { color: var(--warn); }
+  .log-line.error .log-msg { color: var(--danger); }
+  .log-line.accent .log-msg { color: var(--accent); }
+
+  /* ── Spinner ───────────────────────────────────────────── */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Audio player ──────────────────────────────────────── */
+  .audio-player-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    margin-bottom: 10px;
+  }
+
+  .player-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    width: 60px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  audio {
+    flex: 1;
+    height: 28px;
+    filter: invert(1) hue-rotate(180deg) brightness(0.7);
+  }
+
+  /* ── Tab bar ───────────────────────────────────────────── */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 11px 16px 10px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; }
+  .tab-content.active { display: flex; flex-direction: column; }
+
+  /* ── Locutor list ──────────────────────────────────────── */
+  .locutor-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+
+  .locutor-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .locutor-item:hover { border-color: var(--border2); }
+  .locutor-item.selected { border-color: var(--accent); background: rgba(88,166,255,0.05); }
+
+  .locutor-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .locutor-name {
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .locutor-dim {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  /* ── Tooltip ───────────────────────────────────────────── */
+  [data-tip] { position: relative; cursor: help; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 5px 9px;
+    border-radius: var(--radius);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 999;
+    line-height: 1.4;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  /* ── Placeholder ───────────────────────────────────────── */
+  .placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 40px;
+    text-align: center;
+    gap: 10px;
+    color: var(--muted);
+  }
+
+  .placeholder-icon { font-size: 36px; opacity: 0.3; }
+
+  .placeholder-text {
+    font-size: 12px;
+    line-height: 1.6;
+    max-width: 280px;
+  }
+
+  /* ── Animations ────────────────────────────────────────── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in { animation: fadeIn 0.25s ease forwards; }
+
+  /* ── Responsive ────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    .panel { border-right: none; border-bottom: 1px solid var(--border); max-height: 280px; }
+    .panel:last-child { border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 12 12" fill="none">
+        <path d="M1 6 Q3 2 6 6 Q9 10 11 6" stroke="#58a6ff" stroke-width="1.5" fill="none"/>
+      </svg>
+    </div>
+    ENTROVOX
+  </div>
+  <div class="status-bar">
+    <span id="api-status-text">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-label">CONECTANDO</span>
+    </span>
+    <span id="model-label">—</span>
+    <span id="locutores-count">0 LOCUTORES</span>
+  </div>
+</header>
+
+<!-- ── App ────────────────────────────────────────────────── -->
+<div class="app">
+
+  <!-- ── LEFT: Configuração ──────────────────────────────── -->
+  <aside class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Configuração</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="section">
+        <div class="section-label">Servidor</div>
+        <div class="form-row">
+          <label>URL da API</label>
+          <input type="url" id="api-url" value="http://localhost:5000" placeholder="http://localhost:5000">
+        </div>
+        <button class="btn btn-ghost" onclick="verificarStatus()" style="width:100%">
+          VERIFICAR CONEXÃO
+        </button>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Processamento</div>
+        <div class="toggle-row">
+          <span class="toggle-label" data-tip="Aplica Wiener + Autoencoder + EnBaSe antes de transcrever">Realce de fala (enhance)</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-enhance" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label" data-tip="Requer openai-whisper instalado no servidor">Transcrição Whisper</span>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-whisper" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-thumb"></span>
+          </label>
+        </div>
+        <div class="form-row" style="margin-top:12px">
+          <label>Idioma</label>
+          <select id="sel-idioma">
+            <option value="pt">Português (pt)</option>
+            <option value="en">English (en)</option>
+            <option value="es">Español (es)</option>
+            <option value="fr">Français (fr)</option>
+            <option value="de">Deutsch (de)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Locutor ativo</div>
+        <div id="locutor-list-cfg" class="locutor-list">
+          <div style="font-size:11px;color:var(--muted);font-style:italic">Nenhum locutor registrado</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted)">
+          Selecione para condicionar a reconstrução ao timbre do locutor.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Experimento WER</div>
+        <div class="form-row">
+          <label>Texto de referência</label>
+          <textarea id="ref-text" placeholder="Digite o texto correto para calcular WER..."></textarea>
+        </div>
+        <button class="btn btn-ghost" id="btn-compare" onclick="compararWER()" style="width:100%" disabled>
+          COMPARAR WER
+        </button>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ── CENTER: Principal ───────────────────────────────── -->
+  <main class="main">
+
+    <!-- Waveforms -->
+    <div class="waveform-zone">
+      <div class="waveform-label">
+        <span>SINAL</span>
+        <span id="audio-info" style="color:var(--muted)">—</span>
+      </div>
+      <div class="waveform-wrap">
+        <canvas class="waveform" id="wave-orig" title="Sinal original"></canvas>
+        <canvas class="waveform" id="wave-clean" title="Sinal realçado"></canvas>
+      </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="audio/*">
+      <div class="drop-icon">◈</div>
+      <div class="drop-text">
+        <strong>Arraste um arquivo de áudio</strong><br>
+        ou clique para selecionar · WAV, MP3, OGG
+      </div>
+    </div>
+
+    <!-- Record -->
+    <div class="record-zone">
+      <button class="btn-record" id="btn-record" onclick="toggleRecord()">
+        <div class="rec-dot"></div>
+      </button>
+      <span class="record-status" id="rec-status">Gravar microfone</span>
+      <span class="record-timer" id="rec-timer" style="display:none">0:00</span>
+      <div style="flex:1"></div>
+      <audio id="audio-orig" controls style="display:none;height:28px;width:200px;filter:invert(1) hue-rotate(180deg) brightness(0.7)"></audio>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn btn-primary" id="btn-process" onclick="processar()" disabled>
+        <span id="btn-icon">▶</span> PROCESSAR
+      </button>
+      <button class="btn btn-ghost" id="btn-download" onclick="baixarAudio()" disabled>
+        ↓ BAIXAR WAV
+      </button>
+      <div style="flex:1"></div>
+      <button class="btn btn-ghost" onclick="limpar()">LIMPAR</button>
+    </div>
+
+    <!-- Tabs + Results -->
+    <div class="tab-bar">
+      <div class="tab active" onclick="setTab('transcricao')">Transcrição</div>
+      <div class="tab" onclick="setTab('metricas')">Métricas EnBaSe</div>
+      <div class="tab" onclick="setTab('wer')">Comparação WER</div>
+    </div>
+
+    <!-- Tab: Transcrição -->
+    <div class="tab-content active results-area" id="tab-transcricao">
+      <div id="transcript-area">
+        <div class="placeholder">
+          <div class="placeholder-icon">◈</div>
+          <div class="placeholder-text">Carregue um arquivo de áudio ou grave pelo microfone, depois clique em Processar.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Métricas -->
+    <div class="tab-content" id="tab-metricas" style="padding:20px 24px;overflow-y:auto">
+      <div id="metrics-area">
+        <div class="placeholder">
+          <div class="placeholder-icon">◈</div>
+          <div class="placeholder-text">As métricas EnBaSe aparecerão aqui após o processamento.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: WER -->
+    <div class="tab-content" id="tab-wer" style="padding:20px 24px;overflow-y:auto">
+      <div id="wer-area">
+        <div class="placeholder">
+          <div class="placeholder-icon">◈</div>
+          <div class="placeholder-text">Insira um texto de referência no painel esquerdo e clique em "Comparar WER".</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── RIGHT: Locutores + Log ──────────────────────────── -->
+  <aside class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Locutores / Log</span>
+    </div>
+
+    <div style="border-bottom:1px solid var(--border); padding:14px 18px">
+      <div class="section-label" style="margin-bottom:10px">Registrar locutor</div>
+      <div class="form-row">
+        <label>ID do locutor</label>
+        <input type="text" id="loc-id" placeholder="ex: joao_silva">
+      </div>
+      <div class="form-row">
+        <label>Amostras limpas de referência (2–3 WAVs)</label>
+        <input type="file" id="loc-files" accept="audio/*" multiple style="font-family:var(--mono);font-size:11px;color:var(--text);background:var(--surface);border:1px solid var(--border);padding:6px;width:100%;border-radius:var(--radius)">
+      </div>
+      <button class="btn btn-ghost" onclick="registrarLocutor()" style="width:100%">
+        REGISTRAR
+      </button>
+    </div>
+
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border)">
+      <div class="section-label" style="margin-bottom:10px">Locutores registrados</div>
+      <div id="locutor-list" class="locutor-list">
+        <div style="font-size:11px;color:var(--muted);font-style:italic">Nenhum</div>
+      </div>
+    </div>
+
+    <div class="panel-header" style="position:relative;top:unset">
+      <span class="panel-title">Log</span>
+      <button class="btn btn-ghost" onclick="clearLog()" style="padding:3px 8px;font-size:9px">LIMPAR</button>
+    </div>
+    <div class="log-area" id="log"></div>
+  </aside>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+const state = {
+  audioBlob: null,
+  cleanBlob: null,
+  locutores: [],
+  locutorSelecionado: null,
+  recording: false,
+  mediaRecorder: null,
+  recordChunks: [],
+  recordTimer: null,
+  recordSeconds: 0,
+};
+
+// ── Log ────────────────────────────────────────────────────
+function log(msg, type = 'info') {
+  const area = document.getElementById('log');
+  const now  = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+  const line = document.createElement('div');
+  line.className = `log-line ${type}`;
+  line.innerHTML = `<span class="log-time">${now}</span><span class="log-msg">${msg}</span>`;
+  area.appendChild(line);
+  area.scrollTop = area.scrollHeight;
+}
+
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+// ── API ────────────────────────────────────────────────────
+function apiUrl(path) {
+  const base = document.getElementById('api-url').value.replace(/\/$/, '');
+  return base + path;
+}
+
+async function verificarStatus() {
+  log('Verificando conexão...', 'info');
+  const dot   = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  dot.className = 'status-dot';
+  try {
+    const r = await fetch(apiUrl('/status'));
+    const d = await r.json();
+    dot.className = 'status-dot online';
+    label.textContent = 'ONLINE';
+    document.getElementById('model-label').textContent =
+      d.whisper_disponivel ? `WHISPER/${(d.modelo_whisper||'').toUpperCase()}` : 'SEM WHISPER';
+    document.getElementById('locutores-count').textContent =
+      `${(d.locutores||[]).length} LOCUTORES`;
+    log(`API online · AE: ${d.ae_treinado ? 'treinado' : 'stub'} · Whisper: ${d.whisper_disponivel ? d.modelo_whisper : 'não instalado'}`, 'ok');
+    atualizarLocutores(d.locutores || []);
+  } catch(e) {
+    dot.className = 'status-dot offline';
+    label.textContent = 'OFFLINE';
+    log(`Falha de conexão: ${e.message}`, 'error');
+  }
+}
+
+// ── Locutores ──────────────────────────────────────────────
+function atualizarLocutores(lista) {
+  state.locutores = lista;
+  document.getElementById('locutores-count').textContent = `${lista.length} LOCUTORES`;
+
+  const renderList = (containerId, showNone = true) => {
+    const el = document.getElementById(containerId);
+    if (!lista.length) {
+      el.innerHTML = showNone
+        ? '<div style="font-size:11px;color:var(--muted);font-style:italic">Nenhum</div>'
+        : '<div style="font-size:11px;color:var(--muted);font-style:italic">Nenhum locutor registrado</div>';
+      return;
+    }
+    el.innerHTML = lista.map(id => `
+      <div class="locutor-item ${state.locutorSelecionado === id ? 'selected' : ''}"
+           onclick="selecionarLocutor('${id}')">
+        <div class="locutor-avatar">${id.charAt(0)}</div>
+        <div class="locutor-name">${id}</div>
+        <div class="locutor-dim">emb</div>
+      </div>
+    `).join('');
+  };
+
+  renderList('locutor-list', true);
+  renderList('locutor-list-cfg', false);
+}
+
+function selecionarLocutor(id) {
+  state.locutorSelecionado = state.locutorSelecionado === id ? null : id;
+  atualizarLocutores(state.locutores);
+  log(`Locutor ${state.locutorSelecionado ? 'selecionado: ' + state.locutorSelecionado : 'deselecionado'}`, 'accent');
+}
+
+async function registrarLocutor() {
+  const id    = document.getElementById('loc-id').value.trim();
+  const files = document.getElementById('loc-files').files;
+  if (!id)      { log('Informe um ID para o locutor.', 'warn'); return; }
+  if (!files.length) { log('Selecione ao menos 1 arquivo WAV de referência.', 'warn'); return; }
+
+  log(`Registrando locutor "${id}" com ${files.length} amostra(s)...`, 'info');
+  const form = new FormData();
+  for (let i = 0; i < files.length; i++) form.append(`audio_${i}`, files[i]);
+
+  try {
+    const r = await fetch(apiUrl(`/locutor/registrar?id=${encodeURIComponent(id)}`), {
+      method: 'POST', body: form
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro || r.statusText);
+    log(`Locutor "${id}" registrado · dim_embedding=${d.dim_embedding}`, 'ok');
+    await verificarStatus();
+  } catch(e) {
+    log(`Erro ao registrar locutor: ${e.message}`, 'error');
+  }
+}
+
+// ── Áudio: arquivo ─────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) carregarArquivo(file);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) carregarArquivo(fileInput.files[0]);
+});
+
+function carregarArquivo(file) {
+  state.audioBlob = file;
+  state.cleanBlob = null;
+  document.getElementById('btn-process').disabled = false;
+  document.getElementById('btn-download').disabled = true;
+  document.getElementById('audio-info').textContent =
+    `${file.name}  ·  ${(file.size / 1024).toFixed(1)} KB`;
+
+  // Preview player
+  const audioEl = document.getElementById('audio-orig');
+  audioEl.src = URL.createObjectURL(file);
+  audioEl.style.display = 'block';
+
+  // Waveform
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+      const buf  = await ctx.decodeAudioData(e.target.result);
+      drawWaveform('wave-orig', buf.getChannelData(0), '#58a6ff');
+      drawWaveform('wave-clean', new Float32Array(buf.length), '#3fb950');
+    } catch(_) {}
+  };
+  reader.readAsArrayBuffer(file);
+  log(`Arquivo carregado: ${file.name}`, 'info');
+}
+
+// ── Áudio: gravação ─────────────────────────────────────────
+async function toggleRecord() {
+  if (state.recording) {
+    stopRecord();
+  } else {
+    await startRecord();
+  }
+}
+
+async function startRecord() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.mediaRecorder = new MediaRecorder(stream);
+    state.recordChunks  = [];
+    state.recordSeconds = 0;
+
+    state.mediaRecorder.ondataavailable = e => state.recordChunks.push(e.data);
+    state.mediaRecorder.onstop = () => {
+      const blob = new Blob(state.recordChunks, { type: 'audio/webm' });
+      state.audioBlob = blob;
+      state.cleanBlob = null;
+      const url = URL.createObjectURL(blob);
+      const audioEl = document.getElementById('audio-orig');
+      audioEl.src = url;
+      audioEl.style.display = 'block';
+      document.getElementById('btn-process').disabled = false;
+      document.getElementById('audio-info').textContent =
+        `Gravação · ${state.recordSeconds}s`;
+      log(`Gravação concluída (${state.recordSeconds}s)`, 'ok');
+      stream.getTracks().forEach(t => t.stop());
+    };
+
+    state.mediaRecorder.start();
+    state.recording = true;
+    document.getElementById('btn-record').classList.add('recording');
+    document.getElementById('rec-status').textContent = 'Gravando...';
+    document.getElementById('rec-status').classList.add('active');
+    document.getElementById('rec-timer').style.display = 'inline';
+
+    state.recordTimer = setInterval(() => {
+      state.recordSeconds++;
+      const m = Math.floor(state.recordSeconds / 60);
+      const s = state.recordSeconds % 60;
+      document.getElementById('rec-timer').textContent =
+        `${m}:${String(s).padStart(2,'0')}`;
+    }, 1000);
+
+    log('Gravação iniciada', 'info');
+  } catch(e) {
+    log(`Microfone não disponível: ${e.message}`, 'error');
+  }
+}
+
+function stopRecord() {
+  if (state.mediaRecorder) state.mediaRecorder.stop();
+  clearInterval(state.recordTimer);
+  state.recording = false;
+  document.getElementById('btn-record').classList.remove('recording');
+  document.getElementById('rec-status').textContent = 'Gravar microfone';
+  document.getElementById('rec-status').classList.remove('active');
+  document.getElementById('rec-timer').style.display = 'none';
+}
+
+// ── Waveform renderer ──────────────────────────────────────
+function drawWaveform(canvasId, data, color) {
+  const canvas = document.getElementById(canvasId);
+  const ctx    = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600;
+  const H = canvas.offsetHeight || 50;
+  canvas.width  = W;
+  canvas.height = H;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = getComputedStyle(document.documentElement)
+    .getPropertyValue('--surface').trim();
+  ctx.fillRect(0, 0, W, H);
+
+  if (!data || !data.length) return;
+
+  const step  = Math.ceil(data.length / W);
+  const mid   = H / 2;
+  const amp   = mid * 0.85;
+
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1;
+
+  for (let x = 0; x < W; x++) {
+    let min = 1, max = -1;
+    for (let j = 0; j < step; j++) {
+      const v = data[x * step + j] || 0;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    ctx.moveTo(x, mid + min * amp);
+    ctx.lineTo(x, mid + max * amp);
+  }
+  ctx.stroke();
+
+  // Center line
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  ctx.moveTo(0, mid);
+  ctx.lineTo(W, mid);
+  ctx.stroke();
+}
+
+// ── Processar ──────────────────────────────────────────────
+async function processar() {
+  if (!state.audioBlob) { log('Nenhum áudio carregado.', 'warn'); return; }
+
+  const enhance  = document.getElementById('toggle-enhance').checked;
+  const whisper  = document.getElementById('toggle-whisper').checked;
+  const idioma   = document.getElementById('sel-idioma').value;
+  const locutor  = state.locutorSelecionado;
+
+  const btn = document.getElementById('btn-process');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> PROCESSANDO';
+  log(`Iniciando processamento · enhance=${enhance} · whisper=${whisper}` +
+      (locutor ? ` · locutor=${locutor}` : ''), 'info');
+
+  try {
+    const form = new FormData();
+    form.append('audio', state.audioBlob, 'audio.wav');
+
+    let endpoint, params;
+
+    if (whisper) {
+      endpoint = '/transcrever';
+      params = new URLSearchParams({
+        enhance: enhance ? 'true' : 'false',
+        idioma,
+        ...(locutor ? { id_locutor: locutor } : {}),
+      });
+    } else {
+      endpoint = '/realcar';
+      params = new URLSearchParams({
+        ...(locutor ? { id_locutor: locutor } : {}),
+      });
+    }
+
+    const url = apiUrl(endpoint) + (params.toString() ? '?' + params : '');
+    const r   = await fetch(url, { method: 'POST', body: form });
+    const d   = await r.json();
+
+    if (!r.ok) throw new Error(d.erro || r.statusText);
+
+    log(`Processado em ${d.latencia_ms}ms`, 'ok');
+    renderResultados(d, whisper, enhance);
+
+    // Baixar WAV limpo para waveform
+    await atualizarWaveformLimpo(enhance);
+
+  } catch(e) {
+    log(`Erro: ${e.message}`, 'error');
+    renderErro(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>▶</span> PROCESSAR';
+  }
+}
+
+async function atualizarWaveformLimpo(enhance) {
+  if (!enhance) return;
+  try {
+    const form = new FormData();
+    form.append('audio', state.audioBlob, 'audio.wav');
+    const locutor = state.locutorSelecionado;
+    const params = new URLSearchParams({
+      formato: 'wav',
+      ...(locutor ? { id_locutor: locutor } : {}),
+    });
+    const r = await fetch(apiUrl('/realcar') + '?' + params, { method: 'POST', body: form });
+    if (!r.ok) return;
+    const blob = await r.blob();
+    state.cleanBlob = blob;
+    document.getElementById('btn-download').disabled = false;
+
+    const arr  = await blob.arrayBuffer();
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const buf  = await ctx.decodeAudioData(arr);
+    drawWaveform('wave-clean', buf.getChannelData(0), '#3fb950');
+  } catch(_) {}
+}
+
+function renderResultados(d, whisper, enhance) {
+  const entropia = d.entropia || {};
+  const qualidade = d.qualidade ?? d.qualidade_audio ?? null;
+
+  // Tab: Transcrição
+  const transArea = document.getElementById('transcript-area');
+  const texto = d.texto || null;
+
+  transArea.innerHTML = `
+    <div class="fade-in">
+      ${texto ? `
+        <div class="transcript-box">
+          ${escapeHtml(texto)}
+        </div>
+      ` : `
+        <div class="transcript-box empty">
+          ${whisper
+            ? '(Whisper não instalado no servidor — áudio realçado disponível para download)'
+            : '(Modo apenas realce — ative a transcrição para ver o texto)'}
+        </div>
+      `}
+      <div class="transcript-meta">
+        ${d.latencia_ms != null ? `<div class="meta-chip">LAT <span class="val">${d.latencia_ms}ms</span></div>` : ''}
+        ${d.idioma ? `<div class="meta-chip">LANG <span class="val">${d.idioma.toUpperCase()}</span></div>` : ''}
+        ${d.confianca != null ? `<div class="meta-chip">CONF <span class="val">${(d.confianca*100).toFixed(1)}%</span></div>` : ''}
+        ${qualidade != null ? `<div class="meta-chip">QUAL <span class="val">${(qualidade*100).toFixed(1)}%</span></div>` : ''}
+        ${d.locutor_usado ? `<div class="meta-chip">LOCUTOR <span class="val">${d.locutor_usado}</span></div>` : ''}
+        ${d.ae_ativo != null ? `<div class="meta-chip">AE <span class="val">${d.ae_ativo ? 'ON' : 'STUB'}</span></div>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Tab: Métricas
+  renderMetricas(entropia, qualidade, d);
+
+  setTab('transcricao');
+}
+
+function renderMetricas(e, qualidade, d) {
+  const area = document.getElementById('metrics-area');
+  if (!e || !Object.keys(e).length) {
+    area.innerHTML = '<div class="placeholder"><div class="placeholder-icon">◈</div><div class="placeholder-text">Métricas não disponíveis (active o realce).</div></div>';
+    return;
+  }
+
+  const hMedia  = e.entropia_media  ?? 0;
+  const hMax    = 7.65; // log2(201 bins) ≈ 7.65
+  const hFrac   = hMedia / hMax;
+  const barColor = hFrac > 0.90 ? 'var(--danger)' : hFrac > 0.70 ? 'var(--warn)' : 'var(--accent2)';
+
+  const total   = e.quadros_total    ?? 0;
+  const validos = e.quadros_validos  ?? total;
+  const desc    = e.quadros_descartados ?? 0;
+  const pctVal  = total > 0 ? (validos / total * 100).toFixed(1) : '—';
+  const pctDesc = total > 0 ? (desc    / total * 100).toFixed(1) : '—';
+
+  const qClass = qualidade >= 0.85 ? 'good' : qualidade >= 0.5 ? 'warn' : 'bad';
+
+  area.innerHTML = `
+    <div class="fade-in">
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-name" data-tip="H = −Σ P(f)·log₂P(f)">H média</div>
+          <div class="metric-value" style="color:${barColor}">${hMedia.toFixed(3)}<span class="metric-unit">bits</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-name">Qualidade</div>
+          <div class="metric-value ${qClass}">${qualidade != null ? (qualidade*100).toFixed(1) : '—'}<span class="metric-unit">%</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-name">Quadros válidos</div>
+          <div class="metric-value good">${validos}<span class="metric-unit">/ ${total}</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-name">Descartados</div>
+          <div class="metric-value ${desc > 0 ? 'warn' : 'good'}">${desc}<span class="metric-unit">(${pctDesc}%)</span></div>
+        </div>
+      </div>
+
+      <div class="entropy-bar-wrap">
+        <div class="entropy-label-row">
+          <span>ENTROPIA ESPECTRAL</span>
+          <span>${(hFrac*100).toFixed(1)}% do e_max</span>
+        </div>
+        <div class="entropy-track">
+          <div class="entropy-fill" style="width:${Math.min(hFrac*100,100)}%;background:${barColor}"></div>
+        </div>
+        <div class="entropy-zones">
+          <span>SILÊNCIO</span>
+          <span>FALA ESTÁVEL</span>
+          <span>FALA RUIDOSA</span>
+          <span>RUÍDO PURO</span>
+        </div>
+      </div>
+
+      <div class="entropy-bar-wrap">
+        <div class="entropy-label-row"><span>DISTRIBUIÇÃO DE QUADROS</span></div>
+        <div class="frame-dist">
+          <div class="frame-seg valid"   style="width:${pctVal}%">${pctVal}%</div>
+          <div class="frame-seg invalid" style="width:${pctDesc}%">${pctDesc > 2 ? pctDesc+'%' : ''}</div>
+        </div>
+        <div class="frame-legend">
+          <span><div class="legend-dot" style="background:rgba(63,185,80,0.5)"></div> Válidos (${validos})</span>
+          <span><div class="legend-dot" style="background:rgba(248,81,73,0.5)"></div> Descartados (${desc})</span>
+        </div>
+      </div>
+
+      ${e.entropia_min != null ? `
+        <div style="margin-top:16px">
+          <div class="section-label">Estatísticas detalhadas</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px">
+            ${[['H mín', e.entropia_min?.toFixed(3)], ['H máx', e.entropia_max?.toFixed(3)], ['H std', e.entropia_std?.toFixed(3)]].map(([l,v]) => `
+              <div class="metric-card">
+                <div class="metric-name">${l}</div>
+                <div class="metric-value" style="font-size:16px">${v ?? '—'}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${e.distribuicao_tipos ? `
+        <div style="margin-top:16px">
+          <div class="section-label">Distribuição por tipo</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+            ${Object.entries(e.distribuicao_tipos).map(([tipo, qtd]) => `
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="font-family:var(--mono);font-size:10px;color:var(--muted);width:160px">${tipo.replace(/_/g,' ')}</div>
+                <div style="flex:1;height:6px;background:var(--surface);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${total > 0 ? (qtd/total*100).toFixed(1) : 0}%;background:var(--accent);border-radius:3px"></div>
+                </div>
+                <div style="font-family:var(--mono);font-size:10px;color:var(--text);width:28px;text-align:right">${qtd}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${d.entropia_pos_reconstrucao != null ? `
+        <div class="metric-card" style="margin-top:12px">
+          <div class="metric-name">H pós-reconstrução (AE)</div>
+          <div class="metric-value" style="font-size:16px">${d.entropia_pos_reconstrucao.toFixed(3)}<span class="metric-unit">bits</span></div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderErro(msg) {
+  document.getElementById('transcript-area').innerHTML = `
+    <div class="fade-in transcript-box" style="border-color:var(--danger);color:var(--danger)">
+      Erro: ${escapeHtml(msg)}
+    </div>
+  `;
+}
+
+// ── WER ────────────────────────────────────────────────────
+async function compararWER() {
+  if (!state.audioBlob) { log('Nenhum áudio carregado.', 'warn'); return; }
+  const ref = document.getElementById('ref-text').value.trim();
+  if (!ref) { log('Insira um texto de referência.', 'warn'); return; }
+
+  const btn = document.getElementById('btn-compare');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  log('Comparando WER com/sem realce...', 'info');
+
+  try {
+    const form = new FormData();
+    form.append('audio', state.audioBlob, 'audio.wav');
+    form.append('referencia', ref);
+    if (state.locutorSelecionado) form.append('id_locutor', state.locutorSelecionado);
+
+    const r = await fetch(apiUrl('/transcrever/comparar'), { method: 'POST', body: form });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro || r.statusText);
+
+    renderWER(d);
+    log(`WER base=${(d.wer_sem_enhance*100).toFixed(1)}% → enhance=${(d.wer_com_enhance*100).toFixed(1)}% (Δ${(d.reducao_wer*100).toFixed(1)}pp)`,
+        d.melhora ? 'ok' : 'warn');
+    setTab('wer');
+  } catch(e) {
+    log(`Erro WER: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'COMPARAR WER';
+  }
+}
+
+function renderWER(d) {
+  const wSem = (d.wer_sem_enhance * 100).toFixed(1);
+  const wCom = (d.wer_com_enhance * 100).toFixed(1);
+  const delta = (d.reducao_wer * 100).toFixed(1);
+  const melhora = d.melhora;
+  const maxWer = Math.max(d.wer_sem_enhance, d.wer_com_enhance, 0.01);
+
+  document.getElementById('wer-area').innerHTML = `
+    <div class="fade-in">
+      <div class="metrics-grid" style="margin-bottom:16px">
+        <div class="metric-card">
+          <div class="metric-name">WER sem realce</div>
+          <div class="metric-value bad">${wSem}<span class="metric-unit">%</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-name">WER com realce</div>
+          <div class="metric-value ${melhora ? 'good' : 'warn'}">${wCom}<span class="metric-unit">%</span></div>
+        </div>
+      </div>
+
+      <div class="metric-card" style="margin-bottom:16px;text-align:center">
+        <div class="metric-name">Redução absoluta de WER</div>
+        <div class="metric-value ${melhora ? 'good' : 'warn'}" style="font-size:32px">
+          ${melhora ? '▼' : '▲'} ${Math.abs(delta)}<span class="metric-unit">pp</span>
+        </div>
+      </div>
+
+      <div class="wer-compare">
+        <div class="wer-row">
+          <div class="wer-label">SEM ENH.</div>
+          <div class="wer-bar-track">
+            <div class="wer-bar-fill" style="width:${(d.wer_sem_enhance/maxWer*100).toFixed(1)}%;background:var(--danger)"></div>
+          </div>
+          <div class="wer-pct" style="color:var(--danger)">${wSem}%</div>
+        </div>
+        <div class="wer-row">
+          <div class="wer-label">COM ENH.</div>
+          <div class="wer-bar-track">
+            <div class="wer-bar-fill" style="width:${(d.wer_com_enhance/maxWer*100).toFixed(1)}%;background:${melhora ? 'var(--accent2)' : 'var(--warn)'}"></div>
+          </div>
+          <div class="wer-pct" style="color:${melhora ? 'var(--accent2)' : 'var(--warn)'}">${wCom}%</div>
+        </div>
+      </div>
+
+      ${d.transcricao_base || d.transcricao_enhanced ? `
+        <div style="margin-top:16px">
+          <div class="section-label" style="margin-bottom:10px">Transcrições</div>
+          ${d.transcricao_base ? `
+            <div style="margin-bottom:10px">
+              <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">SEM REALCE</div>
+              <div class="transcript-box" style="font-size:13px;border-color:var(--border)">${escapeHtml(d.transcricao_base)}</div>
+            </div>
+          ` : ''}
+          ${d.transcricao_enhanced ? `
+            <div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--accent2);margin-bottom:6px">COM REALCE</div>
+              <div class="transcript-box" style="font-size:13px;border-color:var(--accent2)">${escapeHtml(d.transcricao_enhanced)}</div>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ── Download ───────────────────────────────────────────────
+async function baixarAudio() {
+  if (!state.audioBlob) return;
+  log('Baixando áudio realçado...', 'info');
+
+  try {
+    const form = new FormData();
+    form.append('audio', state.audioBlob, 'audio.wav');
+    const locutor = state.locutorSelecionado;
+    const params  = new URLSearchParams({
+      formato: 'wav',
+      ...(locutor ? { id_locutor: locutor } : {}),
+    });
+    const r = await fetch(apiUrl('/realcar') + '?' + params, { method: 'POST', body: form });
+    if (!r.ok) { log('Falha ao obter áudio limpo.', 'error'); return; }
+
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'entrovox_limpo.wav';
+    a.click();
+    URL.revokeObjectURL(url);
+    log('Download iniciado: entrovox_limpo.wav', 'ok');
+  } catch(e) {
+    log(`Erro no download: ${e.message}`, 'error');
+  }
+}
+
+// ── Tabs ───────────────────────────────────────────────────
+function setTab(id) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const tabs = ['transcricao', 'metricas', 'wer'];
+    t.classList.toggle('active', tabs[i] === id);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => {
+    c.classList.toggle('active', c.id === 'tab-' + id);
+  });
+}
+
+// ── Limpar ─────────────────────────────────────────────────
+function limpar() {
+  state.audioBlob = null;
+  state.cleanBlob = null;
+  document.getElementById('btn-process').disabled  = true;
+  document.getElementById('btn-download').disabled = true;
+  document.getElementById('audio-orig').style.display = 'none';
+  document.getElementById('audio-info').textContent = '—';
+  document.getElementById('file-input').value = '';
+
+  ['wave-orig', 'wave-clean'].forEach(id => {
+    const c = document.getElementById(id);
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, c.width, c.height);
+  });
+
+  document.getElementById('transcript-area').innerHTML = `
+    <div class="placeholder">
+      <div class="placeholder-icon">◈</div>
+      <div class="placeholder-text">Carregue um arquivo de áudio ou grave pelo microfone, depois clique em Processar.</div>
+    </div>`;
+  document.getElementById('metrics-area').innerHTML = `
+    <div class="placeholder">
+      <div class="placeholder-icon">◈</div>
+      <div class="placeholder-text">As métricas EnBaSe aparecerão aqui após o processamento.</div>
+    </div>`;
+
+  log('Interface limpa', 'info');
+}
+
+// ── Observe ref text ───────────────────────────────────────
+document.getElementById('ref-text').addEventListener('input', () => {
+  document.getElementById('btn-compare').disabled =
+    !document.getElementById('ref-text').value.trim();
+});
+
+// ── Helpers ────────────────────────────────────────────────
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ───────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  verificarStatus();
+  log('ENTROVOX inicializado', 'accent');
+});
+</script>
+</body>
+</html>
